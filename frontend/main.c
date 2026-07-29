@@ -150,7 +150,9 @@ void emu_set_default_config(void)
 	pl_rearmed_cbs.gpu_unai.fast_lighting = 1;
 	pl_rearmed_cbs.gpu_unai.scale_hires = 1;
 #endif
+#ifndef DRC_DISABLE
 	ndrc_g.hacks = 0;
+#endif
 
 	in_type[0] = PSE_PAD_TYPE_STANDARD;
 	in_type[1] = PSE_PAD_TYPE_STANDARD;

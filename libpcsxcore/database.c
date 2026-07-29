@@ -2,7 +2,9 @@
 #include "sio.h"
 #include "ppf.h"
 #include "cdrom-async.h"
+#ifdef HAVE_ARI64
 #include "new_dynarec/new_dynarec.h"
+#endif
 #include "lightrec/plugin.h"
 
 /* It's duplicated from emu_if.c */
@@ -136,6 +138,7 @@ hack_db[] =
 	HACK_ENTRY(drc_no_thread, drc_no_thread_db),
 };
 
+#ifdef HAVE_ARI64
 static const struct
 {
 	int mult;
@@ -196,6 +199,7 @@ cycle_multiplier_overrides[] =
 	/* NBA Jam: Tournament Edition - halftime stats */
 	{ 161, { "SLUS00002", "SLPS00199", "SLES00068" } },
 };
+#endif
 
 static const struct
 {
@@ -258,9 +262,10 @@ void Apply_Hacks_Cdrom(void)
 	}
 
 	/* Dynarec game-specific hacks */
+#ifdef HAVE_ARI64
 	ndrc_g.hacks_pergame = 0;
 	if (Config.hacks.f1 || Config.hacks.drc_no_thread)
-		ndrc_g.hacks_pergame |= NDHACK_THREAD_FORCE; // force without *_ON -> off
+		ndrc_g.hacks_pergame |= NDHACK_THREAD_FORCE;
 	Config.cycle_multiplier_override = 0;
 
 	for (i = 0; i < ARRAY_SIZE(cycle_multiplier_overrides); i++)
@@ -278,6 +283,7 @@ void Apply_Hacks_Cdrom(void)
 			break;
 		}
 	}
+#endif
 
 	Config.gpu_timing_override = 0;
 	for (i = 0; i < ARRAY_SIZE(gpu_timing_hack_db); i++)

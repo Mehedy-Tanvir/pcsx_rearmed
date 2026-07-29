@@ -76,7 +76,7 @@ void gpuDrawS(PtrUnion packet, const PS gpuSpriteDriver, s32 *w_out, s32 *h_out)
 	gpuSpriteDriver(Pixel, x1, (u8 *)gpu_unai.inn.TBA, gpu_unai.inn);
 }
 
-void gpuDrawT(PtrUnion packet, const PT gpuTileDriver, s32 *w_out, s32 *h_out)
+void gpuDrawT(PtrUnion packet, const PT gpuTileDriver, s32 *w_out = nullptr, s32 *h_out = nullptr)
 {
 	s32 x0, x1, y0, y1;
 
@@ -101,8 +101,9 @@ void gpuDrawT(PtrUnion packet, const PT gpuTileDriver, s32 *w_out, s32 *h_out)
 	if (x1 > xmax) x1 = xmax;
 	x1 -= x0;
 	if (x1 <= 0) return;
-	*w_out = x1;
-	*h_out = y1 - y0;
+	if (w_out) *w_out = x1;
+	if (h_out) *h_out = y1 - y0;
+
 
 	const u16 Data = GPU_RGB16(le32_to_u32(packet.U4[0]));
 	le16_t *Pixel = &gpu_unai.vram[FRAME_OFFSET(x0, y0)];

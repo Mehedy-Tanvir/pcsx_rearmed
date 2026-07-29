@@ -145,8 +145,9 @@ static void gpuGP0Cmd_0xEx(gpu_unai_t &gpu_unai, u32 cmd_word)
 		case 6: {
 			// GP0(E6h) - Mask Bit Setting
 			DO_LOG(("GP0(0xE6) SetMask(0x%x)\n", cmd_word));
-			gpu_unai.Masking  = (cmd_word & 0x2) <<  1;
-			gpu_unai.PixelMSB = (cmd_word & 0x1) <<  8;
+			gpu_unai.Masking   = (cmd_word & 0x2) <<  1;
+			gpu_unai.PixelMSB  = (cmd_word & 0x1) <<  8;
+			gpu_unai.blit_mask = (cmd_word & 0x2) != 0;
 		} break;
 	}
 }
@@ -481,7 +482,8 @@ void gpuSendPacketFunction(const int PRIM)
 				if ((le32_raw(gpu_unai.PacketBuffer.U4[0]) & HTOLE32(0xF8F8F8)) != HTOLE32(0x808080))
 					driver_idx |= Lighting;
 				PS driver = gpuSpriteSpanDrivers[driver_idx];
-				gpuDrawS(packet, driver);
+				s32 w, h;
+				gpuDrawS(packet, driver, &w, &h);
 				gpu_unai.fb_dirty = true;
 				DO_LOG(("gpuDrawS(0x%x)\n",PRIM));
 			}
@@ -534,7 +536,8 @@ void gpuSendPacketFunction(const int PRIM)
 				if ((le32_raw(gpu_unai.PacketBuffer.U4[0]) & HTOLE32(0xF8F8F8)) != HTOLE32(0x808080))
 					driver_idx |= Lighting;
 				PS driver = gpuSpriteSpanDrivers[driver_idx];
-				gpuDrawS(packet, driver);
+				s32 w, h;
+				gpuDrawS(packet, driver, &w, &h);
 				gpu_unai.fb_dirty = true;
 				DO_LOG(("gpuDrawS(0x%x)\n",PRIM));
 			}
@@ -582,7 +585,8 @@ void gpuSendPacketFunction(const int PRIM)
 				if ((le32_raw(gpu_unai.PacketBuffer.U4[0]) & HTOLE32(0xF8F8F8)) != HTOLE32(0x808080))
 					driver_idx |= Lighting;
 				PS driver = gpuSpriteSpanDrivers[driver_idx];
-				gpuDrawS(packet, driver);
+				s32 w, h;
+				gpuDrawS(packet, driver, &w, &h);
 				gpu_unai.fb_dirty = true;
 				DO_LOG(("gpuDrawS(0x%x)\n",PRIM));
 			}

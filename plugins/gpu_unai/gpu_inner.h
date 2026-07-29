@@ -367,6 +367,8 @@ const PT gpuTileDrivers[32] = {
 	TIBLOCK(0<<8), TIBLOCK(1<<8)
 };
 
+#define gpuTileSpanDrivers gpuTileDrivers
+
 #undef TI
 #undef TN
 #undef TA
@@ -532,6 +534,8 @@ static void SpriteNULL(le16_t *pPixel, u32 count, const u8 *pTxt_base,
 const PS gpuSpriteDrivers[256] = {
 	TIBLOCK(0<<8), TIBLOCK(1<<8)
 };
+
+#define gpuSpriteSpanDrivers gpuSpriteDrivers
 
 #undef TI
 #undef TN

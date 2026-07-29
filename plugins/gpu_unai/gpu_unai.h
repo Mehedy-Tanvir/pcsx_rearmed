@@ -344,6 +344,8 @@ struct gpu_unai_t {
 	                       // [1] : Texture window offset Y
 	                       // [2] : Texture window mask X
 	                       // [3] : Texture window mask Y
+	u32 u_msk;             // Texture window u mask with fixed-point bits
+	u32 v_msk;             // Texture window v mask with fixed-point bits
 
 	u16 DrawingArea[4];    // [0] : Drawing area top left X
 	                       // [1] : Drawing area top left Y
@@ -370,6 +372,7 @@ struct gpu_unai_t {
 	u8 BLEND_MODE;
 	u8 TEXT_MODE;
 	u8 Masking;
+	bool blit_mask;
 
 	u16 PixelMSB;
 
