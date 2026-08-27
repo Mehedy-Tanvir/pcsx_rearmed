@@ -233,6 +233,8 @@ static void setup_sprite_untextured_4x(psx_gpu_struct *psx_gpu, s32 x, s32 y,
   height *= 2;
   if (width > 1024)
     width = 1024;
+  if (height > 1024)
+    height = 1024;
   setup_sprite_untextured(psx_gpu, x, y, u, v, width, height, color);
 }
 

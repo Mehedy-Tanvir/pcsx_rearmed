@@ -8366,7 +8366,7 @@ static noinline void pass4_cull_unused_regs(struct compile_state *st)
   for (i = st->slen - 1; i >= 0; i--)
   {
     int hr;
-    __builtin_prefetch(regs[i-2].regmap);
+    if (i > 1) __builtin_prefetch(regs[i-2].regmap);
     if(dops[i].is_jump)
     {
       if(cinfo[i].ba<st->start || cinfo[i].ba>=(st->start+st->slen*4))
@@ -9072,7 +9072,7 @@ static noinline void pass6_clean_registers_r(struct compile_state *st,
     u_int hr_candirty = 0;
     assert(HOST_REGS < 32);
     make_rregs(regs[i].regmap, rregmap_i, &hr_candirty);
-    __builtin_prefetch(regs[i-1].regmap);
+    if (i) __builtin_prefetch(regs[i-1].regmap);
     if(dops[i].is_jump)
     {
       signed char branch_rregmap_i[RRMAP_SIZE];

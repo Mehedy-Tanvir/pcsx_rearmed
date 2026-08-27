@@ -4107,6 +4107,18 @@ static noinline void setup_sprite_untextured_simple(psx_gpu_struct *psx_gpu,
    psx_gpu->mask_msb;
   u32 color_32bpp = color_16bpp | (color_16bpp << 16);
 
+  s32 vram_height = (psx_gpu->vram_out_ptr == psx_gpu->enhancement_current_buf_ptr)
+    ? 1024 : 512;
+
+  if (x < 0) { width += x; x = 0; }
+  if (width <= 0) return;
+  if (x + width > 1024) width = 1024 - x;
+
+  if (y < 0) { height += y; y = 0; }
+  if (height <= 0) return;
+  if (y >= vram_height) return;
+  if (y + height > vram_height) height = vram_height - y;
+
   u16 *vram_ptr16 = psx_gpu->vram_out_ptr + x + (y * 1024);
   u32 *vram_ptr;
 

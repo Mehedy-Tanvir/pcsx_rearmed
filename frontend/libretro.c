@@ -3537,6 +3537,15 @@ void retro_run(void)
    psxRegs.stop = 0;
    psxCpu->Execute(&psxRegs);
 
+   {
+      static int run_count = 0;
+      run_count++;
+      if (run_count <= 5 || (run_count % 300 == 0)) {
+         LogWarn("retro_run #%d: vout_fb_dirty=%d vout_can_dupe=%d vout_buf_ptr=%p vout_w=%d vout_h=%d\n",
+                 run_count, vout_fb_dirty, vout_can_dupe, vout_buf_ptr, vout_width, vout_height);
+      }
+   }
+
    if (pl_rearmed_cbs.fskip_dirty) {
       if (frameskip_counter >= frameskip_interval || !pl_rearmed_cbs.fskip_force)
          frameskip_counter = 0;

@@ -464,6 +464,15 @@ void GPUwriteStatus(uint32_t data)
 
   gpu.state.fb_dirty_display_area |= fb_dirty;
 
+  {
+    static int ws_count = 0;
+    ws_count++;
+    if (cmd == 5 && (ws_count <= 10 || (ws_count % 600 == 0))) {
+      SysPrintf("GPUwriteStatus cmd=0x%02x data=0x%08x fb_dirty=%d fb_dirty_display_area=%d\n",
+                cmd, data, gpu.state.fb_dirty, gpu.state.fb_dirty_display_area);
+    }
+  }
+
 #ifdef GPUwriteStatus_ext
   GPUwriteStatus_ext(data);
 #endif
@@ -1119,6 +1128,16 @@ static void GPUupdateLace(void)
   int delay_vout_update = 0;
   int updated = 1;
 
+  {
+    static int ul_count = 0;
+    ul_count++;
+    if (ul_count <= 5 || (ul_count % 300 == 0)) {
+      SysPrintf("GPUupdateLace #%d: fb_dirty=%d fb_dirty_display_area=%d blanking=%d blanked=%d cmd_len=%d\n",
+                ul_count, gpu.state.fb_dirty, gpu.state.fb_dirty_display_area,
+                !!(gpu.status & PSX_GPU_STATUS_BLANKING), gpu.state.blanked, gpu.cmd_len);
+    }
+  }
+
   if (gpu.frameskip.set) {
     uint32_t flip_delay = *gpu.state.frame_count - gpu.frameskip.last_flip_frame;
     if (gpu_async_enabled(&gpu))
@@ -1178,6 +1197,13 @@ static void GPUupdateLace(void)
 
 void GPUvBlank(int is_vblank, int lcf)
 {
+  static int vb_count = 0;
+  vb_count++;
+  if (vb_count <= 10 || (vb_count % 300 == 0)) {
+    SysPrintf("GPUvBlank #%d: is_vblank=%d lcf=%d alt_flip=%d\n",
+              vb_count, is_vblank, lcf, gpu.state.use_alternative_flip);
+  }
+
   int interlace;
   interlace = gpu.state.allow_interlace
     && (gpu.status & PSX_GPU_STATUS_INTERLACE)

@@ -660,6 +660,7 @@ void ResetTextureArea(BOOL bDelTex)
   for(j=0;j<MAXTPAGES;j++)
    {
     tss=pscSubtexStore[i][j];
+    if(!tss) continue;
     (tss+SOFFA)->pos.l=0;
     (tss+SOFFB)->pos.l=0;
     (tss+SOFFC)->pos.l=0;
@@ -826,6 +827,7 @@ void InvalidateSubSTextureArea(int X,int Y,int W, int H)
         npos.l=((x1-xa)<<(26-k))|((x2-xa)<<(18-k))|y1|y2;
 
         {
+         if(!pscSubtexStore[k][j]) goto skip_invalidate;
          tsb=pscSubtexStore[k][j]+SOFFA;iMax=tsb->pos.l;tsb++;
          for(i=0;i<iMax;i++,tsb++)
           if(tsb->ClutID && XCHECK(tsb->pos,npos)) {tsb->ClutID=0;MarkFree(tsb);}
@@ -851,6 +853,7 @@ void InvalidateSubSTextureArea(int X,int Y,int W, int H)
             if(tsb->ClutID && XCHECK(tsb->pos,npos)) {tsb->ClutID=0;MarkFree(tsb);}
           }
         }
+        skip_invalidate:
       }
     }
   }
@@ -3529,6 +3532,7 @@ void DoTexGarbageCollection(void)
   for(j=0;j<MAXTPAGES;j++)
    for(iC=0;iC<4;iC++)                                 // loop all texture rect info areas
     {
+     if(!pscSubtexStore[i][j]) continue;
      tsb=pscSubtexStore[i][j]+(iC*SOFFB);
      iMax=tsb->pos.l;
      if(iMax)
@@ -3570,7 +3574,19 @@ unsigned char * CheckTextureInSubSCache(int TextureMode,unsigned int GivenClutId
  // find matching texturepart first... speed up...
  //--------------------------------------------------------------//
 
+ if(TextureMode < 0 || TextureMode > 2 || GlobalTexturePage < 0 || GlobalTexturePage >= MAXTPAGES)
+  {
+   *pCache=0;
+   return 0;
+  }
+
  tsg=pscSubtexStore[TextureMode][GlobalTexturePage];
+ if(!tsg)
+  {
+   *pCache=0;
+   return 0;
+  }
+
  tsg+=((GivenClutId&CLUTCHK)>>CLUTSHIFT)*SOFFB;
 
  iMax=tsg->pos.l;
@@ -3784,6 +3800,7 @@ ENDLOOP:
       for(j=0;j<MAXTPAGES;j++)
        {
         tsb=pscSubtexStore[i][j];
+        if(!tsb) continue;
         (tsb+SOFFA)->pos.l=0;
         (tsb+SOFFB)->pos.l=0;
         (tsb+SOFFC)->pos.l=0;
@@ -4019,6 +4036,7 @@ void CompressTextureSpace(void)
    for(k=0;k<MAXTPAGES;k++)
     {
      tsg=pscSubtexStore[j][k];
+     if(!tsg) continue;
 
      if((!(dwTexPageComp&(1<<k))))
       {
@@ -4071,16 +4089,17 @@ void CompressTextureSpace(void)
 
              tsx->pos.l=r.l;
              if(!GetCompressTexturePlace(tsx))         // no place?
-              {
-               for(i=0;i<3;i++)                        // -> clean up everything
-                for(j=0;j<MAXTPAGES;j++)
-                 {
-                  tsb=pscSubtexStore[i][j];
-                  (tsb+SOFFA)->pos.l=0;
-                  (tsb+SOFFB)->pos.l=0;
-                  (tsb+SOFFC)->pos.l=0;
-                  (tsb+SOFFD)->pos.l=0;
-                 }
+               {
+                for(i=0;i<3;i++)                        // -> clean up everything
+                 for(j=0;j<MAXTPAGES;j++)
+                  {
+                   tsb=pscSubtexStore[i][j];
+                   if(!tsb) continue;
+                   (tsb+SOFFA)->pos.l=0;
+                   (tsb+SOFFB)->pos.l=0;
+                   (tsb+SOFFC)->pos.l=0;
+                   (tsb+SOFFD)->pos.l=0;
+                  }
                for(i=0;i<iSortTexCnt;i++)
                 {ul=pxSsubtexLeft[i];ul->l=0;}
                usLRUTexPage=0;
@@ -4188,6 +4207,12 @@ GLuint SelectSubTextureS(int TextureMode, unsigned int GivenClutId)
  // search cache
  iCache=0;
  OPtr=CheckTextureInSubSCache(TextureMode,GivenClutId,&iCache);
+
+ // cache invalid (texture cache not initialized)?
+ if(!OPtr && iCache==0)
+  {
+   return (GLuint)gTexName;
+  }
 
  // cache full? compress and try again
  if(iCache==0xffff)

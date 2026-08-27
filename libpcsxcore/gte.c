@@ -205,7 +205,9 @@ static inline s64 mac123add(u32 id, u32 *flags, s64 in, s32 addend) {
 	u32 flag = 1u << (31 - id);
 	asm("adds %Q[a], %Q[in], %[add], lsl #20\n"
 	    "adcs %R[a], %R[in], %[add], asr #12\n"
+	    "it pl\n"
 	    "movpl %[flag], %[flag], lsr #3\n"
+	    "it vs\n"
 	    "orrvs %[flags], %[flags], %[flag]"
 	    : [a]"=&r"(a), [flags]"+&r"(*flags), [flag]"+&r"(flag)
 	    : [in]"r"(in), [add]"r"(addend)
@@ -248,7 +250,9 @@ static inline s64 mac123sub_s12(u32 id, u32 *flags, s32 in12, s32 subtrahend, in
 	s64 in = (s64)in12 << (12+MAC123_SHIFT);
 	asm("subs %Q[a], %Q[in], %[sub], lsl #20\n"
 	    "sbcs %R[a], %R[in], %[sub], asr #12\n"
+	    "it pl\n"
 	    "movpl %[flag], %[flag], lsr #3\n"
+	    "it vs\n"
 	    "orrvs %[flags], %[flags], %[flag]"
 	    : [a]"=&r"(a), [flags]"+&r"(*flags), [flag]"+&r"(flag)
 	    : [in]"r"(in), [sub]"r"(subtrahend)
@@ -295,9 +299,11 @@ static inline s64 mac0flags(u32 *flags, s64 a) {
 #define LIM(flags_, value_, max_, min_, flag_) \
 ({s32 r_ = value_; \
   asm("cmp   %[val], %[max]\n" \
+      "itt gt\n" \
       "movgt %[val], %[max]\n" \
       "orrgt %[flags], %[flag]\n" \
       "cmp   %[val], %[min]\n" \
+      "itt lt\n" \
       "movlt %[val], %[min]\n" \
       "orrlt %[flags], %[flag]\n" \
       : [val]"+&r"(r_), [flags]"+&r"(*(flags_)) \

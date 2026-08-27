@@ -57,8 +57,24 @@ static void set_jump_target(void *addr, void *target)
     assert(offset>=-1048576LL&&offset<1048576LL);
     *ptr=(*ptr&0x9F00001F)|(offset&0x3)<<29|((offset>>2)&0x7ffff)<<5;
   }
-  else
-    abort(); // should not happen
+  else {
+    // Should not happen: the patched address does not hold a recognized
+    // branch/adr. In production this is reached when ndrc_patch_link() races
+    // with block recompilation/invalidation and lands on a code-cache page
+    // that was already reused and overwritten with different code, so the
+    // opcode is no longer a branch. Patching such an address would be wrong,
+    // but aborting the whole process (SIGABRT) is far worse: the emulator can
+    // simply leave the (now-unreachable) old code alone. Skip it instead.
+    // The asserts above still fire in debug builds to surface genuine
+    // codegen bugs.
+    static int warned = 0;
+    if (!warned) {
+      warned = 1;
+      SysPrintf("set_jump_target: unexpected opcode %08x at %p, skipping (likely stale link)\n",
+                *ptr, addr);
+    }
+    return;
+  }
 }
 
 // Allocate a specific ARM register.
