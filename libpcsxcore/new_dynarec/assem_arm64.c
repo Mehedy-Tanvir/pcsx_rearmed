@@ -31,6 +31,22 @@ static void set_jump_target_far1(u_int *insn_, void *target)
   intptr_t offset = (u_char *)target - (u_char *)insn_;
   assert(in == 0x14000000);
   assert(-134217728 <= offset && offset < 134217728);
+  // Called with an unvalidated site by ndrc_patch_link() (from dyna_linker).
+  // With NDEBUG the asserts above are gone, so verify before writing: if the
+  // patch site no longer holds an unconditional branch, or the branch can't
+  // reach the target, the link is stale (the code cache page was recycled).
+  // Patching it would corrupt whatever now lives there, so leave it alone -
+  // the caller just keeps using the slow dyna_linker path. Same reasoning as
+  // the fallback in set_jump_target() below.
+  if (in != 0x14000000 || offset < -134217728 || offset >= 134217728) {
+    static int warned_far1 = 0;
+    if (!warned_far1) {
+      warned_far1 = 1;
+      SysPrintf("%s: skipping stale link: insn %08x at %p -> %p\n",
+                __func__, *insn, insn_, target);
+    }
+    return;
+  }
   in |= (offset >> 2) & 0x3ffffff;
   *insn = in;
 }
