@@ -6886,39 +6886,17 @@ void new_dynarec_load_blocks(const void *save, int size)
 {
   const struct savestate_block *sblocks = save;
   int count = size / sizeof(sblocks[0]);
-  struct block_info *block;
-  u_int page;
   uint32_t f;
   int i, b;
 
-  // update all block dirty-ness
-  for (page = 0, b = i = 0; page < ARRAY_SIZE(blocks); page++) {
-    for (block = blocks[page]; block != NULL; block = block->next_by_vaddr, b++) {
-      if (!block->source) // hack block?
-        continue;
-      assert(block->source && block->copy);
-      if (memcmp(block->source, block->copy, block->len)) {
-        invalidate_block(block);
-        block_clear_jump_outs(block, 1);
-        continue;
-      }
-
-      // see try_restore_block
-      block->is_dirty = block->inv_near_misses = 0;
-      mark_invalid_code(block->start, block->len, 0);
-      i++;
-    }
-  }
-  inv_debug("load_blocks: %d/%d clean blocks\n", i, b);
-
-  for (page = 0; page < ARRAY_SIZE(jumps); page++) {
-    if (jumps[page] && jumps[page]->count == 0) {
-      free(jumps[page]);
-      jumps[page] = NULL;
-    }
-  }
+  // Clear all existing blocks, jumps, and TC to avoid stale state.
+  // During Phase 3, ndrc_get_addr_ht_param() may recompile blocks which
+  // triggers TC eviction via block_info_finish()->clear_tcache_space().
+  // Eviction destroys old blocks and patches jump stubs, which can
+  // corrupt the linked list / jumps[] state inherited from the old session.
+  // A full clear ensures Phase 3 recompiles everything on a clean slate.
+  new_dynarec_clear_full();
   do_clear_cache();
-  mini_ht_clear();
 
   for (b = 0; b < count; b++) {
     for (i = 1; i < 32; i++)
