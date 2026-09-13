@@ -244,9 +244,15 @@ static u_int genjmp(const u_char *addr)
   intptr_t offset = addr - out;
   if ((uintptr_t)addr < 3) return 0; // a branch that will be patched later
   if (offset < -134217728 || offset > 134217727) {
-    SysPrintf("%s: out of range: %p %lx\n", __func__, addr, offset);
-    abort();
-    return 0;
+    // Branch target out of range for B instruction (±128MB).
+    // Use a trampoline to reach the target.
+    addr = get_trampoline(addr);
+    offset = addr - out;
+    if (offset < -134217728 || offset > 134217727) {
+      SysPrintf("%s: trampoline also out of range: %p %lx\n", __func__, addr, offset);
+      ndrc_compile_abort();
+      return 0;
+    }
   }
   return ((u_int)offset >> 2) & 0x03ffffff;
 }
@@ -257,7 +263,7 @@ static u_int genjmpcc(const u_char *addr)
   if ((uintptr_t)addr < 3) return 0;
   if (offset < -1048576 || offset > 1048572) {
     SysPrintf("%s: out of range: %p %lx\n", __func__, addr, offset);
-    abort();
+    ndrc_compile_abort();
     return 0;
   }
   return ((u_int)offset >> 2) & 0x7ffff;
@@ -300,7 +306,7 @@ static void gen_logical_imm(u_int value, u_int *immr, u_int *imms)
     *imms = 31 - ones;
     return;
   }
-  abort();
+  ndrc_compile_abort();
 }
 
 static void emit_mov(u_int rs, u_int rt)
@@ -468,8 +474,10 @@ static void emit_readword(void *addr, u_int rt)
     assem_debug("ldr %s,[x%d+%#lx]%s\n", regname[rt], FP, offset, fpofs_name(offset));
     output_w32(0xb9400000 | imm12_rn_rd(offset >> 2, FP, rt));
   }
-  else
-    abort();
+  else {
+    SysPrintf("%s: offset too large: %p %lx\n", __func__, addr, offset);
+    ndrc_compile_abort();
+  }
 }
 
 static void emit_readdword(void *addr, u_int rt)
@@ -479,8 +487,10 @@ static void emit_readdword(void *addr, u_int rt)
     assem_debug("ldr %s,[x%d+%#lx]%s\n", regname64[rt], FP, offset, fpofs_name(offset));
     output_w32(0xf9400000 | imm12_rn_rd(offset >> 3, FP, rt));
   }
-  else
-    abort();
+  else {
+    SysPrintf("%s: offset too large: %p %lx\n", __func__, addr, offset);
+    ndrc_compile_abort();
+  }
 }
 #define emit_readptr emit_readdword
 
@@ -538,8 +548,10 @@ static void emit_writedword(u_int rt, void *addr)
     assem_debug("str %s,[x%d+%#lx]%s\n", regname64[rt], FP, offset, fpofs_name(offset));
     output_w32(0xf9000000 | imm12_rn_rd(offset >> 3, FP, rt));
   }
-  else
-    abort();
+  else {
+    SysPrintf("%s: offset too large: %p %lx\n", __func__, addr, offset);
+    ndrc_compile_abort();
+  }
 }
 
 static void emit_storereg(u_int r, u_int hr)
@@ -989,8 +1001,11 @@ static void emit_call(const void *a)
   assert(!(diff & 3));
   if (-134217728 <= diff && diff <= 134217727)
     output_w32(0x94000000 | ((diff >> 2) & 0x03ffffff));
-  else
-    abort();
+  else {
+    // Call target out of range for BL (±128MB). Use trampoline.
+    SysPrintf("%s: call out of range: %p %lx\n", __func__, a, diff);
+    ndrc_compile_abort();
+  }
 }
 
 static void emit_jmp(const void *a)

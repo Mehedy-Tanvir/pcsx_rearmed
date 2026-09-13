@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <errno.h>
+#include <setjmp.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #ifdef __MACH__
@@ -81,6 +82,23 @@ static Jit g_jit;
   if (err_print_count++ < 64u) \
     SysPrintf(__VA_ARGS__); \
 } while (0)
+
+// Safety net: setjmp/longjmp to catch abort() during block compilation
+// instead of crashing the process. When compilation fails, we fall back to
+// the interpreter for that block.
+static jmp_buf ndrc_compile_jmpbuf;
+static int ndrc_compile_jmp_active;
+
+// Call this instead of abort() during block compilation. If a setjmp is
+// active, longjmp back to new_recompile_block which will return -1.
+// If no setjmp is active (e.g. during init), call real abort().
+#define ndrc_compile_abort() do { \
+  if (ndrc_compile_jmp_active) { \
+    SysPrintf("ndrc: compile abort at %s:%d\n", __FILE__, __LINE__); \
+    longjmp(ndrc_compile_jmpbuf, 1); \
+  } \
+  abort(); \
+} while(0)
 
 // from linkage_*
 extern int cycle_count; // ... until end of the timeslice, counts -N -> 0 (CCREG)
@@ -998,7 +1016,7 @@ static attr_unused void check_for_block_changes(u_int start, u_int end)
           block->start, block->start + block->len,
           *(long long *)block->source, *(long long *)block->copy, psxRegs.pc);
         fflush(stdout);
-        abort();
+        ndrc_compile_abort();
       }
     }
   }
@@ -1286,7 +1304,7 @@ static uint32_t get_const(const struct regstat *cur, signed char reg)
     return current_constmap[hr];
 
   SysPrintf("Unknown constant in r%d\n", reg);
-  abort();
+  ndrc_compile_abort();
 }
 
 // Least soon needed registers
@@ -1618,6 +1636,8 @@ static const char *fpofs_name(u_int ofs)
 #ifdef __i386__
 #include "assem_x86.c"
 #endif
+static void *get_trampoline(const void *f);
+
 #ifdef __x86_64__
 #include "assem_x64.c"
 #endif
@@ -1639,7 +1659,7 @@ static void *get_trampoline(const void *f)
   }
   if (i == ARRAY_SIZE(tramp->f)) {
     SysPrintf("trampoline table is full, last func %p\n", f);
-    abort();
+    ndrc_compile_abort();
   }
   if (tramp->f[i] == NULL) {
     start_tcache_write(&tramp->f[i], &tramp->f[i + 1]);
@@ -1965,7 +1985,7 @@ static void ndrc_add_jump_out(u_int vaddr, void *stub)
   return;
 oom:
   SysPrintf("ndrc jump OOM\n");
-  abort();
+  ndrc_compile_abort();
 }
 
 void ndrc_patch_link(u_int vaddr, void *insn, void *stub, void *target)
@@ -2054,7 +2074,7 @@ static void evict_alloc_reg(struct compile_state *st, struct regstat *cur,
     }
   }
   SysPrintf("This shouldn't happen (evict_alloc_reg)\n");
-  abort();
+  ndrc_compile_abort();
 }
 
 // Note: registers are allocated clean (unmodified state)
@@ -3138,7 +3158,7 @@ static int get_ro_reg(const struct regstat *i_regs, int host_tempreg_free)
     emit_loadreg(ROREG, r = HOST_TEMPREG);
   }
   if (r < 0)
-    abort();
+    ndrc_compile_abort();
   return r;
 }
 
@@ -4457,7 +4477,7 @@ static void do_alignmentstub(struct compile_state *st, int n)
 void multdiv_assemble(int i,struct regstat *i_regs)
 {
   printf("Need multdiv_assemble for this architecture.\n");
-  abort();
+  ndrc_compile_abort();
 }
 #endif
 
@@ -5605,7 +5625,7 @@ static void do_ccstub(struct compile_state *st, int n)
         r_pc = get_reg(branch_regs[i].regmap, RTEMP);
       }
     }
-    else {SysPrintf("Unknown branch type in do_ccstub\n");abort();}
+    else {SysPrintf("Unknown branch type in do_ccstub\n");ndrc_compile_abort();}
   }
   emit_writeword(r_pc, &psxRegs.pc);
   // Update cycle count
@@ -7807,7 +7827,7 @@ static noinline void pass3_register_alloc(struct compile_state *st, u_int addr)
         current.u|=1;
       } else {
         SysPrintf("oops, branch at end of block with no delay slot @%08x\n", st->start + i*4);
-        abort();
+        ndrc_compile_abort();
       }
     }
     assert(dops[i].is_ds == ds);
@@ -9494,7 +9514,7 @@ static struct block_info *block_info_new(u_int start, u_int len,
   block = calloc(block_info_get_size(jump_in_count, jump_out_count), 1);
   if (!block) {
     SysPrintf("ndrc block OOM\n");
-    abort();
+    ndrc_compile_abort();
   }
   assert(jump_in_count > 0);
   assert(jump_out_count < 0x10000u);
@@ -9570,6 +9590,16 @@ static int noinline new_recompile_block(u_int addr)
   u_int pagelimit = 0;
   u_int state_rflags = 0;
   int i;
+
+  // Set up safety net: if any abort() is called during compilation
+  // (via ndrc_compile_abort), longjmp back here instead of crashing.
+  ndrc_compile_jmp_active = 1;
+  if (setjmp(ndrc_compile_jmpbuf) != 0) {
+    // Compilation failed (longjmp from ndrc_compile_abort).
+    // Return -1 to tell get_addr() to fall back to interpreter.
+    ndrc_compile_jmp_active = 0;
+    return -1;
+  }
 
   assem_debug("NOTCOMPILED: addr = %08x -> %p\n", addr, log_addr(out));
 
@@ -9994,6 +10024,7 @@ static int noinline new_recompile_block(u_int addr)
 #ifdef ASSEM_PRINT
   fflush(stdout);
 #endif
+  ndrc_compile_jmp_active = 0;
   stat_inc(stat_bc_direct);
   return 0;
 }
